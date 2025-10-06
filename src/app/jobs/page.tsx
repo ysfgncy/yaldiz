@@ -10,14 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { createClient } from '@/lib/supabase/client'
 import { CheckCircle, Clock, Plus } from 'lucide-react'
 import Link from 'next/link'
@@ -29,6 +21,33 @@ const currencyFormatter = new Intl.NumberFormat('tr-TR', {
   currency: 'TRY',
 })
 
+const statusStyles: Record<string, string> = {
+  tamamlandı: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+  bekliyor: 'bg-amber-100 text-amber-700 border border-amber-200',
+}
+
+const statusActions: Record<string, { label: string; nextLabel: string; Icon: typeof CheckCircle }> = {
+  tamamlandı: {
+    label: 'Tamamlandı',
+    nextLabel: 'Beklemeye al',
+    Icon: CheckCircle,
+  },
+  bekliyor: {
+    label: 'Bekliyor',
+    nextLabel: 'Tamamlandı işaretle',
+    Icon: Clock,
+  },
+}
+
+function formatDate(value: string) {
+  if (!value) return '-'
+  return new Date(value).toLocaleDateString('tr-TR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
 interface Job {
   id: string
   job_name: string
@@ -39,7 +58,7 @@ interface Job {
   customer: {
     id: string
     name: string
-  }
+  } | null
 }
 
 export default function JobsPage() {
@@ -139,70 +158,93 @@ export default function JobsPage() {
             {isLoading ? (
               <div className="text-center py-8">Yükleniyor...</div>
             ) : jobs.length > 0 ? (
-              <Table className="w-full table-fixed text-sm">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-20">Durum</TableHead>
-                    <TableHead>İş Adı</TableHead>
-                    <TableHead>Müşteri</TableHead>
-                    <TableHead className="w-28">Fiyat</TableHead>
-                    <TableHead className="w-40 text-right">İşlemler</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {jobs.map((job) => (
-                    <TableRow key={job.id}>
-                      <TableCell className="text-center">
+              <div className="space-y-4">
+                {jobs.map((job) => {
+                  const customer = job.customer
+                  const config = statusActions[job.status] ?? statusActions.bekliyor
+                  const StatusIcon = config.Icon
+
+                  return (
+                    <div
+                      key={job.id}
+                      className="rounded-xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-primary/40 hover:shadow-md"
+                    >
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="space-y-2">
+                          <Link
+                            href={`/jobs/${job.id}`}
+                            className="text-lg font-semibold text-foreground hover:text-primary"
+                          >
+                            {job.job_name}
+                          </Link>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
+                            {customer ? (
+                              <Link
+                                href={`/customers/${customer.id}`}
+                                className="text-primary hover:underline"
+                              >
+                                {customer.name}
+                              </Link>
+                            ) : (
+                              <span className="italic text-muted-foreground">Müşteri bilgisi yok</span>
+                            )}
+                            {customer ? (
+                              <span className="hidden sm:inline" aria-hidden="true">
+                                •
+                              </span>
+                            ) : null}
+                            <span>{formatDate(job.created_date)}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-start gap-2 sm:items-end">
+                          <span
+                            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                              statusStyles[job.status] ?? 'bg-gray-100 text-gray-700 border border-gray-200'
+                            }`}
+                          >
+                            <StatusIcon className="h-4 w-4" />
+                            {config.label}
+                          </span>
+                          <span className="text-lg font-semibold text-foreground">
+                            {currencyFormatter.format(job.price)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {job.job_details ? (
+                        <p className="mt-3 text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
+                          {job.job_details}
+                        </p>
+                      ) : null}
+
+                      <div className="mt-4 flex flex-wrap gap-2">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => toggleJobStatus(job.id, job.status)}
-                          className="p-1"
+                          className="flex items-center gap-2"
                         >
-                          {job.status === 'tamamlandı' ? (
-                            <CheckCircle className="h-5 w-5 text-green-600" />
-                          ) : (
-                            <Clock className="h-5 w-5 text-yellow-600" />
-                          )}
+                          {job.status === 'tamamlandı' ? <Clock className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                          {config.nextLabel}
                         </Button>
-                      </TableCell>
-                      <TableCell className="font-medium max-w-[160px] truncate">
-                        <Link
-                          href={`/jobs/${job.id}`}
-                          className="hover:underline block truncate"
-                        >
-                          {job.job_name}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="max-w-[160px] truncate">
-                        <Link
-                          href={`/customers/${job.customer.id}`}
-                          className="text-blue-600 hover:underline block truncate"
-                        >
-                          {job.customer.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {currencyFormatter.format(job.price)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Link href={`/payments/new?customerId=${job.customer.id}&jobId=${job.id}`}>
+                        {customer ? (
+                          <Link href={`/payments/new?customerId=${customer.id}&jobId=${job.id}`}>
                             <Button variant="outline" size="sm">
                               Ödeme Al
                             </Button>
                           </Link>
-                          <Link href={`/jobs/${job.id}/edit`}>
-                            <Button variant="ghost" size="sm">
-                              Düzenle
-                            </Button>
-                          </Link>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        ) : null}
+                        <Link href={`/jobs/${job.id}/edit`}>
+                          <Button variant="ghost" size="sm">
+                            Düzenle
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             ) : (
               <div className="text-center py-12">
                 <p className="text-gray-500 mb-4">

@@ -29,32 +29,6 @@ type AccountSummaryRecord = {
   balance: number | string | null
 }
 
-type RecentJobRecord = {
-  id: string
-  job_name: string
-  price: number | string | null
-  status: 'bekliyor' | 'tamamlandı'
-  created_date: string | null
-  customer: {
-    id: string
-    name: string
-  } | null
-}
-
-type CustomerRelation = {
-  id: string
-  name: string
-}
-
-type RecentJobRecordRaw = Omit<RecentJobRecord, 'customer'> & {
-  customer: CustomerRelation | CustomerRelation[] | null | undefined
-}
-
-function formatDate(value: string | null): string {
-  if (!value) return '-'
-  return new Date(value).toLocaleDateString('tr-TR')
-}
-
 export default async function DashboardPage() {
   const supabase = await createClient()
 
@@ -69,7 +43,6 @@ export default async function DashboardPage() {
     pendingJobsRes,
     paymentsThisMonthRes,
     accountSummaryRes,
-    recentJobsRes,
   ] = await Promise.all([
     supabase.from('customers').select('id', { count: 'exact', head: true }),
     supabase
@@ -84,11 +57,6 @@ export default async function DashboardPage() {
     supabase
       .from('account_summary')
       .select('customer_id, customer_name, total_jobs, total_payments, balance'),
-    supabase
-      .from('jobs')
-      .select('id, job_name, price, status, created_date, customer:customers(id, name)')
-      .order('created_at', { ascending: false })
-      .limit(5),
   ])
 
   const dashboardErrors: Array<[string, typeof customersRes.error]> = [
@@ -96,7 +64,6 @@ export default async function DashboardPage() {
     ['pendingJobs', pendingJobsRes.error],
     ['payments', paymentsThisMonthRes.error],
     ['accountSummary', accountSummaryRes.error],
-    ['recentJobs', recentJobsRes.error],
   ]
 
   dashboardErrors.forEach(([label, error]) => {
@@ -123,16 +90,6 @@ export default async function DashboardPage() {
     .filter((record) => Number(record.balance ?? 0) > 0)
     .sort((a, b) => Number(b.balance ?? 0) - Number(a.balance ?? 0))
     .slice(0, 5)
-
-  const recentJobsRaw = (recentJobsRes.data as RecentJobRecordRaw[]) ?? []
-  const recentJobs: RecentJobRecord[] = recentJobsRaw.map(({ customer, ...job }) => {
-    const normalizedCustomer = Array.isArray(customer) ? customer[0] : customer
-
-    return {
-      ...job,
-      customer: normalizedCustomer ?? null,
-    }
-  })
 
   const quickActions = [
     {
@@ -194,52 +151,7 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Recent Activity */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Son Eklenen İşler</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recentJobs.length > 0 ? (
-              <div className="space-y-4">
-                {recentJobs.map((job) => (
-                  <div
-                    key={job.id}
-                    className="rounded-lg border p-4 transition-colors hover:border-primary/40 hover:bg-primary/5"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <Link
-                          href={`/jobs/${job.id}`}
-                          className="font-semibold text-gray-900 hover:underline"
-                        >
-                          {job.job_name}
-                        </Link>
-                        <p className="text-sm text-gray-500">
-                          {job.customer?.name ?? 'Müşteri bilgisi yok'} · {formatDate(job.created_date)}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-start sm:items-end">
-                        <p className="text-base font-semibold text-gray-900">
-                          {currencyFormatter.format(Number(job.price ?? 0))}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {job.status === 'tamamlandı' ? 'Tamamlandı' : 'Bekliyor'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                Henüz iş kaydı bulunmuyor
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
