@@ -15,7 +15,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { createClient } from '@/lib/supabase/client'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -38,6 +38,8 @@ interface Customer {
 
 export default function NewJobPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const preselectedCustomerId = searchParams.get('customerId')
   const [isLoading, setIsLoading] = useState(false)
   const [customers, setCustomers] = useState<Customer[]>([])
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true)
@@ -46,13 +48,17 @@ export default function NewJobPage() {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<JobFormData>({
     resolver: zodResolver(jobSchema),
     defaultValues: {
+      customer_id: preselectedCustomerId ?? '',
       created_date: new Date().toISOString().split('T')[0],
     },
   })
+
+  const selectedCustomerId = watch('customer_id')
 
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -66,8 +72,19 @@ export default function NewJobPage() {
         if (error) throw error
         const customerList = data || []
         setCustomers(customerList)
+
         if (customerList.length > 0) {
-          setValue('customer_id', customerList[0].id)
+          const hasPreselected = preselectedCustomerId
+            ? customerList.some((customer) => customer.id === preselectedCustomerId)
+            : false
+
+          const initialCustomerId = hasPreselected
+            ? preselectedCustomerId!
+            : customerList[0].id
+
+          setValue('customer_id', initialCustomerId)
+        } else {
+          setValue('customer_id', '')
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu'
@@ -80,7 +97,7 @@ export default function NewJobPage() {
     }
 
     fetchCustomers()
-  }, [setValue])
+  }, [preselectedCustomerId, setValue])
 
   const onSubmit = async (data: JobFormData) => {
     setIsLoading(true)
@@ -155,8 +172,10 @@ export default function NewJobPage() {
                 <Label htmlFor="customer_id">
                   Müşteri <span className="text-red-500">*</span>
                 </Label>
+                <input type="hidden" {...register('customer_id')} />
                 <Select
                   onValueChange={(value) => setValue('customer_id', value)}
+                  value={selectedCustomerId || undefined}
                   disabled={isLoading}
                 >
                   <SelectTrigger className="w-full">

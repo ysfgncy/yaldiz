@@ -15,7 +15,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { createClient } from '@/lib/supabase/client'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -47,6 +47,8 @@ interface JobOption {
 
 export default function NewPaymentPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const preselectedCustomerId = searchParams.get('customerId')
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -61,6 +63,7 @@ export default function NewPaymentPage() {
   } = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
+      customer_id: preselectedCustomerId ?? '',
       payment_type: 'nakit',
       payment_date: new Date().toISOString().split('T')[0],
       job_id: 'none',
@@ -89,8 +92,25 @@ export default function NewPaymentPage() {
         if (customerError) throw customerError
         if (jobError) throw jobError
 
-        setCustomers(customerData || [])
+        const customerList = customerData || []
+        setCustomers(customerList)
         setJobs(jobData || [])
+
+        if (customerList.length > 0) {
+          const hasPreselected = preselectedCustomerId
+            ? customerList.some((customer) => customer.id === preselectedCustomerId)
+            : false
+
+          const initialCustomerId = hasPreselected
+            ? preselectedCustomerId!
+            : customerList[0].id
+
+          setValue('customer_id', initialCustomerId)
+        } else {
+          setValue('customer_id', '')
+        }
+
+        setValue('job_id', 'none')
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu'
         toast.error('Ödeme formu verileri yüklenemedi', {
@@ -102,7 +122,7 @@ export default function NewPaymentPage() {
     }
 
     fetchData()
-  }, [])
+  }, [preselectedCustomerId, setValue])
 
   const onSubmit = async (data: PaymentFormData) => {
     setIsLoading(true)
@@ -196,7 +216,7 @@ export default function NewPaymentPage() {
                     setValue('customer_id', value)
                     setValue('job_id', 'none')
                   }}
-                  value={selectedCustomerId ?? undefined}
+                  value={selectedCustomerId || undefined}
                   disabled={isLoading}
                 >
                   <SelectTrigger className="w-full">

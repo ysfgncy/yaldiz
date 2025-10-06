@@ -40,6 +40,9 @@ type PaymentRecordRaw = Omit<PaymentRecord, 'customer' | 'job'> & {
   }[] | null
 }
 
+export const revalidate = 0
+export const dynamic = 'force-dynamic'
+
 const currencyFormatter = new Intl.NumberFormat('tr-TR', {
   style: 'currency',
   currency: 'TRY',
