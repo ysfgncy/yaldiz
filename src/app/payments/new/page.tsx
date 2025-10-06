@@ -49,6 +49,7 @@ export default function NewPaymentPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const preselectedCustomerId = searchParams.get('customerId')
+  const preselectedJobId = searchParams.get('jobId')
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -66,7 +67,7 @@ export default function NewPaymentPage() {
       customer_id: preselectedCustomerId ?? '',
       payment_type: 'nakit',
       payment_date: new Date().toISOString().split('T')[0],
-      job_id: 'none',
+      job_id: preselectedJobId ?? 'none',
     },
   })
 
@@ -93,24 +94,42 @@ export default function NewPaymentPage() {
         if (jobError) throw jobError
 
         const customerList = customerData || []
+        const jobList = jobData || []
+
         setCustomers(customerList)
-        setJobs(jobData || [])
+        setJobs(jobList)
 
-        if (customerList.length > 0) {
-          const hasPreselected = preselectedCustomerId
-            ? customerList.some((customer) => customer.id === preselectedCustomerId)
-            : false
+        let resolvedCustomerId: string | undefined
 
-          const initialCustomerId = hasPreselected
-            ? preselectedCustomerId!
-            : customerList[0].id
+        if (preselectedJobId) {
+          const matchedJob = jobList.find((job) => job.id === preselectedJobId)
+          if (matchedJob) {
+            resolvedCustomerId = matchedJob.customer_id
+          }
+        }
 
-          setValue('customer_id', initialCustomerId)
+        if (!resolvedCustomerId && preselectedCustomerId) {
+          const hasPreselected = customerList.some((customer) => customer.id === preselectedCustomerId)
+          if (hasPreselected) {
+            resolvedCustomerId = preselectedCustomerId
+          }
+        }
+
+        if (!resolvedCustomerId && customerList.length > 0) {
+          resolvedCustomerId = customerList[0].id
+        }
+
+        if (resolvedCustomerId) {
+          setValue('customer_id', resolvedCustomerId)
         } else {
           setValue('customer_id', '')
         }
 
-        setValue('job_id', 'none')
+        const resolvedJob = jobList.find(
+          (job) => job.id === preselectedJobId && job.customer_id === resolvedCustomerId
+        )
+
+        setValue('job_id', resolvedJob ? resolvedJob.id : 'none')
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu'
         toast.error('Ödeme formu verileri yüklenemedi', {
@@ -122,7 +141,7 @@ export default function NewPaymentPage() {
     }
 
     fetchData()
-  }, [preselectedCustomerId, setValue])
+  }, [preselectedCustomerId, preselectedJobId, setValue])
 
   const onSubmit = async (data: PaymentFormData) => {
     setIsLoading(true)

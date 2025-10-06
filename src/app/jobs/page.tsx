@@ -24,6 +24,11 @@ import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
+const currencyFormatter = new Intl.NumberFormat('tr-TR', {
+  style: 'currency',
+  currency: 'TRY',
+})
+
 interface Job {
   id: string
   job_name: string
@@ -134,21 +139,20 @@ export default function JobsPage() {
             {isLoading ? (
               <div className="text-center py-8">Yükleniyor...</div>
             ) : jobs.length > 0 ? (
-              <Table className="min-w-[720px]">
+              <Table className="w-full table-fixed text-sm">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Durum</TableHead>
+                    <TableHead className="w-20">Durum</TableHead>
                     <TableHead>İş Adı</TableHead>
                     <TableHead>Müşteri</TableHead>
-                    <TableHead>Fiyat</TableHead>
-                    <TableHead>Tarih</TableHead>
-                    <TableHead className="text-right">İşlemler</TableHead>
+                    <TableHead className="w-28">Fiyat</TableHead>
+                    <TableHead className="w-40 text-right">İşlemler</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {jobs.map((job) => (
                     <TableRow key={job.id}>
-                      <TableCell>
+                      <TableCell className="text-center">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -162,32 +166,38 @@ export default function JobsPage() {
                           )}
                         </Button>
                       </TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium max-w-[160px] truncate">
                         <Link
                           href={`/jobs/${job.id}`}
-                          className="hover:underline"
+                          className="hover:underline block truncate"
                         >
                           {job.job_name}
                         </Link>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="max-w-[160px] truncate">
                         <Link
                           href={`/customers/${job.customer.id}`}
-                          className="text-blue-600 hover:underline"
+                          className="text-blue-600 hover:underline block truncate"
                         >
                           {job.customer.name}
                         </Link>
                       </TableCell>
-                      <TableCell>₺{job.price.toLocaleString('tr-TR')}</TableCell>
-                      <TableCell>
-                        {new Date(job.created_date).toLocaleDateString('tr-TR')}
+                      <TableCell className="whitespace-nowrap">
+                        {currencyFormatter.format(job.price)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Link href={`/jobs/${job.id}/edit`}>
-                          <Button variant="ghost" size="sm">
-                            Düzenle
-                          </Button>
-                        </Link>
+                        <div className="flex justify-end gap-2">
+                          <Link href={`/payments/new?customerId=${job.customer.id}&jobId=${job.id}`}>
+                            <Button variant="outline" size="sm">
+                              Ödeme Al
+                            </Button>
+                          </Link>
+                          <Link href={`/jobs/${job.id}/edit`}>
+                            <Button variant="ghost" size="sm">
+                              Düzenle
+                            </Button>
+                          </Link>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

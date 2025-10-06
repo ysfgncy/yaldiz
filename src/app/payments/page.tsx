@@ -13,31 +13,29 @@ import { createClient } from '@/lib/supabase/server'
 import { Plus } from 'lucide-react'
 import Link from 'next/link'
 
+type CustomerRef = {
+  id: string
+  name: string
+}
+
+type JobRef = {
+  id: string
+  job_name: string
+}
+
 type PaymentRecord = {
   id: string
   amount: string | number
   payment_type: string
   payment_date: string
   notes: string | null
-  customer: {
-    id: string
-    name: string
-  } | null
-  job: {
-    id: string
-    job_name: string
-  } | null
+  customer: CustomerRef | null
+  job: JobRef | null
 }
 
 type PaymentRecordRaw = Omit<PaymentRecord, 'customer' | 'job'> & {
-  customer: {
-    id: string
-    name: string
-  }[] | null
-  job: {
-    id: string
-    job_name: string
-  }[] | null
+  customer: CustomerRef[] | CustomerRef | null
+  job: JobRef[] | JobRef | null
 }
 
 export const revalidate = 0
@@ -61,10 +59,19 @@ export default async function PaymentsPage() {
   }
 
   const paymentsRaw = (payments as PaymentRecordRaw[] | null) ?? []
+
+  const normalizeRelation = <T extends CustomerRef | JobRef>(value: T[] | T | null): T | null => {
+    if (!value) return null
+    if (Array.isArray(value)) {
+      return value[0] ?? null
+    }
+    return value
+  }
+
   const normalizedPayments: PaymentRecord[] = paymentsRaw.map((payment) => ({
     ...payment,
-    customer: payment.customer?.[0] ?? null,
-    job: payment.job?.[0] ?? null,
+    customer: normalizeRelation(payment.customer),
+    job: normalizeRelation(payment.job),
   }))
 
   const totalPaid = normalizedPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
@@ -96,26 +103,22 @@ export default async function PaymentsPage() {
           </CardHeader>
           <CardContent>
             {normalizedPayments.length > 0 ? (
-              <Table className="min-w-[720px]">
+              <Table className="w-full table-fixed text-sm">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Müşteri</TableHead>
-                    <TableHead>Tutar</TableHead>
-                    <TableHead>Ödeme Tipi</TableHead>
-                    <TableHead>Tarih</TableHead>
-                    <TableHead>İlişkili İş</TableHead>
-                    <TableHead>Not</TableHead>
-                    <TableHead className="text-right">İşlemler</TableHead>
+                    <TableHead className="w-1/2">Müşteri</TableHead>
+                    <TableHead className="w-1/4">Tutar</TableHead>
+                    <TableHead className="w-1/4 text-right">Tarih</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {normalizedPayments.map((payment) => (
                     <TableRow key={payment.id}>
-                      <TableCell>
+                      <TableCell className="truncate">
                         {payment.customer ? (
                           <Link
                             href={`/customers/${payment.customer.id}`}
-                            className="text-blue-600 hover:underline"
+                            className="text-blue-600 hover:underline block truncate"
                           >
                             {payment.customer.name}
                           </Link>
@@ -123,46 +126,11 @@ export default async function PaymentsPage() {
                           <span className="text-gray-500">Müşteri bilgisi yok</span>
                         )}
                       </TableCell>
-                      <TableCell className="font-medium">
-                        {currencyFormatter.format(Number(payment.amount || 0))}
+                      <TableCell className="font-medium whitespace-nowrap">
+                        ₺{Math.trunc(Number(payment.amount || 0)).toLocaleString('tr-TR')}
                       </TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                          {payment.payment_type === 'nakit'
-                            ? 'Nakit'
-                            : payment.payment_type === 'havale'
-                              ? 'Havale/EFT'
-                              : 'Çek'}
-                        </span>
-                      </TableCell>
-                      <TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
                         {new Date(payment.payment_date).toLocaleDateString('tr-TR')}
-                      </TableCell>
-                      <TableCell>
-                        {payment.job ? (
-                          <Link
-                            href={`/jobs/${payment.job.id}`}
-                            className="text-blue-600 hover:underline"
-                          >
-                            {payment.job.job_name}
-                          </Link>
-                        ) : (
-                          <span className="text-gray-500">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-gray-600">
-                        {payment.notes ? (
-                          <span className="line-clamp-1">{payment.notes}</span>
-                        ) : (
-                          '-'
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Link href={`/payments/${payment.id}/edit`}>
-                          <Button variant="ghost" size="sm">
-                            Düzenle
-                          </Button>
-                        </Link>
                       </TableCell>
                     </TableRow>
                   ))}
